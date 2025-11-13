@@ -50,7 +50,7 @@ exports.submitReading = async (req, res) => {
             data: reading
         });
         
-    } catch (error) => {
+    } catch (error) {
         console.error('Submit reading error:', error);
         res.status(500).json({
             success: false,

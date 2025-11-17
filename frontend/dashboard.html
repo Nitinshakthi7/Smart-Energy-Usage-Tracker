@@ -14,10 +14,10 @@
         <div class="nav-left">
             <div class="logo">⚡ EnergyTrack</div>
             <div class="nav-tabs">
-                <a href="#" class="nav-tab active">Dashboard</a>
-                <a href="#" class="nav-tab">Devices</a>
-                <a href="#" class="nav-tab">History</a>
-                <a href="#" class="nav-tab">Settings</a>
+                <a href="#" class="nav-tab active" data-tab="dashboard">Dashboard</a>
+                <a href="#" class="nav-tab" data-tab="devices">Devices</a>
+                <a href="#" class="nav-tab" data-tab="history">History</a>
+                <a href="#" class="nav-tab" data-tab="settings">Settings</a>
             </div>
         </div>
         <div class="nav-right">
@@ -30,128 +30,218 @@
 
     <div class="dashboard-container">
 
-        <div class="welcome-section">
-            <h1>Welcome back, <span id="welcome-name">User</span>! 👋</h1>
-            <p class="last-updated">Last updated: <span id="last-update">Just now</span></p>
-        </div>
+        <section id="dashboard-content" class="tab-content active" data-content="dashboard">
+            <div class="welcome-section">
+                <h1>Welcome back, <span id="welcome-name">User</span>! 👋</h1>
+                <p class="last-updated">Last updated: <span id="last-update">Just now</span></p>
+            </div>
 
-        <div class="meter-section card">
-            <h2 class="section-title">Live Energy Meter</h2>
-            <div class="meter-container">
-                <canvas id="energy-meter" width="300" height="300"></canvas>
-                <div class="meter-reading">
-                    <div class="current-watts" id="current-watts">0</div>
-                    <div class="watts-label">Watts</div>
-                    <div class="meter-status" id="meter-status">Normal Usage</div>
+            <div class="meter-section card">
+                <h2 class="section-title">Live Energy Meter</h2>
+                <div class="meter-container">
+                    <canvas id="energy-meter" width="300" height="300"></canvas>
+                    <div class="meter-reading">
+                        <div class="current-watts" id="current-watts">0</div>
+                        <div class="watts-label">Watts</div>
+                        <div class="meter-status" id="meter-status">Normal Usage</div>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="stats-row">
+            <div class="stats-row">
+                
+                <div class="stat-card card">
+                    <div class="stat-icon">⚡</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Today's Usage</div>
+                        <div class="stat-value" id="today-usage">0</div>
+                        <div class="stat-unit">kWh</div>
+                        <div class="stat-change positive">
+                            <span id="usage-change">+12%</span> vs yesterday
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card card">
+                    <div class="stat-icon">💰</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Today's Cost</div>
+                        <div class="stat-value" id="today-cost">₹0</div>
+                        <div class="stat-unit">INR</div>
+                        <div class="stat-change negative">
+                            <span id="cost-change">+₹45</span> vs yesterday
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card card">
+                    <div class="stat-icon">🌱</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Carbon Footprint</div>
+                        <div class="stat-value" id="carbon-footprint">0</div>
+                        <div class="stat-unit">kg CO₂</div>
+                        <div class="stat-trees">
+                            <span id="trees-needed">5</span> trees to offset
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card card">
+                    <div class="stat-icon">🔥</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Tracking Streak</div>
+                        <div class="stat-value" id="streak-days">0</div>
+                        <div class="stat-unit">days</div>
+                        <div class="stat-change positive">
+                            Keep it up!
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="charts-row">
+                
+                <div class="chart-card card">
+                    <h3 class="chart-title">Top Energy Consumers</h3>
+                    <canvas id="top-consumers-chart"></canvas>
+                </div>
+
+                <div class="chart-card card chart-large">
+                    <h3 class="chart-title">24-Hour Energy Timeline</h3>
+                    <canvas id="timeline-chart"></canvas>
+                </div>
+
+            </div>
+
+            <div class="alerts-section card">
+                <h3 class="section-title">⚠️ Alerts & Recommendations</h3>
+                <div id="alerts-container" class="alerts-container">
+                    <div class="alert-item alert-warning">
+                        <div class="alert-icon">⚠️</div>
+                        <div class="alert-content">
+                            <div class="alert-title">High Usage Detected</div>
+                            <div class="alert-message">Air conditioner has been running for 8 hours continuously</div>
+                            <div class="alert-time">2 minutes ago</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="room-breakdown-section">
+                <h3 class="section-title">Room-by-Room Breakdown</h3>
+                <div id="rooms-container" class="rooms-grid">
+                </div>
+            </div>
+
+            <div class="heatmap-section card">
+                <h3 class="section-title">Monthly Activity Heat Map</h3>
+                <div class="heatmap-header">
+                    <div class="heatmap-month-year" id="heatmap-month-year"></div>
+                </div>
+                <div class="heatmap-legend">
+                    <span>Less Energy</span>
+                    <div class="legend-scale">
+                        <div class="legend-box level-0"></div>
+                        <div class="legend-box level-1"></div>
+                        <div class="legend-box level-2"></div>
+                        <div class="legend-box level-3"></div>
+                        <div class="legend-box level-4"></div>
+                    </div>
+                    <span>More Energy</span>
+                </div>
+                <div id="heatmap-calendar" class="heatmap-calendar">
+                </div>
+            </div>
+        </section>
+
+        <section id="devices-content" class="tab-content" data-content="devices">
+            <div class="welcome-section">
+                <h1>Manage Your Devices</h1>
+                <p>Add, edit, and organize your home appliances.</p>
+            </div>
+
+            <div class="toolbar">
+                <button id="add-device-btn" class="btn btn-primary">Add New Device</button>
+            </div>
+
+            <div class="devices-table-container card">
+                <table class="devices-table">
+                    <thead>
+                        <tr>
+                            <th>Device Name</th>
+                            <th>Room</th>
+                            <th>Type</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="devices-tbody">
+                        
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="history-content" class="tab-content" data-content="history">
+            <div class="welcome-section">
+                <h1>Consumption History</h1>
+                <p>Review your past energy usage data.</p>
+            </div>
+
+            <div class="history-toolbar card">
+                <div class="filter-group">
+                    <label for="time-range-filter">Time Range:</label>
+                    <select id="time-range-filter">
+                        <option value="day">Day</option>
+                        <option value="week">Week</option>
+                        <option value="month">Month</option>
+                        <option value="year">Year</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="device-filter">Device:</label>
+                    <select id="device-filter">
+                        <option value="all">All Devices</option>
+                        
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="sort-by">Sort By:</label>
+                    <select id="sort-by">
+                        <option value="date_desc">Date (Newest)</option>
+                        <option value="date_asc">Date (Oldest)</option>
+                        <option value="usage_desc">Usage (High-Low)</option>
+                        <option value="usage_asc">Usage (Low-High)</option>
+                    </select>
+                </div>
+                <button id="apply-filters-btn" class="btn btn-primary">Apply</button>
+            </div>
+
+            <div class="history-table-container card">
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Device</th>
+                            <th>Usage (kWh)</th>
+                            <th>Cost (₹)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-tbody">
+                        
+                    </tbody>
+                </table>
+            </div>
             
-            <div class="stat-card card">
-                <div class="stat-icon">⚡</div>
-                <div class="stat-content">
-                    <div class="stat-label">Today's Usage</div>
-                    <div class="stat-value" id="today-usage">0</div>
-                    <div class="stat-unit">kWh</div>
-                    <div class="stat-change positive">
-                        <span id="usage-change">+12%</span> vs yesterday
-                    </div>
-                </div>
+        </section>
+
+        <section id="settings-content" class="tab-content" data-content="settings">
+            <div class="welcome-section">
+                <h1>Settings</h1>
+                <p>Configure your account and preferences.</p>
             </div>
-
-            <div class="stat-card card">
-                <div class="stat-icon">💰</div>
-                <div class="stat-content">
-                    <div class="stat-label">Today's Cost</div>
-                    <div class="stat-value" id="today-cost">₹0</div>
-                    <div class="stat-unit">INR</div>
-                    <div class="stat-change negative">
-                        <span id="cost-change">+₹45</span> vs yesterday
-                    </div>
-                </div>
-            </div>
-
-            <div class="stat-card card">
-                <div class="stat-icon">🌱</div>
-                <div class="stat-content">
-                    <div class="stat-label">Carbon Footprint</div>
-                    <div class="stat-value" id="carbon-footprint">0</div>
-                    <div class="stat-unit">kg CO₂</div>
-                    <div class="stat-trees">
-                        <span id="trees-needed">5</span> trees to offset
-                    </div>
-                </div>
-            </div>
-
-            <div class="stat-card card">
-                <div class="stat-icon">🔥</div>
-                <div class="stat-content">
-                    <div class="stat-label">Tracking Streak</div>
-                    <div class="stat-value" id="streak-days">0</div>
-                    <div class="stat-unit">days</div>
-                    <div class="stat-change positive">
-                        Keep it up!
-                    </div>
-                </div>
-            </div>
-
-        </div>
-
-        <div class="charts-row">
             
-            <div class="chart-card card">
-                <h3 class="chart-title">Top Energy Consumers</h3>
-                <canvas id="top-consumers-chart"></canvas>
-            </div>
-
-            <div class="chart-card card chart-large">
-                <h3 class="chart-title">24-Hour Energy Timeline</h3>
-                <canvas id="timeline-chart"></canvas>
-            </div>
-
-        </div>
-
-        <div class="alerts-section card">
-            <h3 class="section-title">⚠️ Alerts & Recommendations</h3>
-            <div id="alerts-container" class="alerts-container">
-                <div class="alert-item alert-warning">
-                    <div class="alert-icon">⚠️</div>
-                    <div class="alert-content">
-                        <div class="alert-title">High Usage Detected</div>
-                        <div class="alert-message">Air conditioner has been running for 8 hours continuously</div>
-                        <div class="alert-time">2 minutes ago</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="room-breakdown-section">
-            <h3 class="section-title">Room-by-Room Breakdown</h3>
-            <div id="rooms-container" class="rooms-grid">
-            </div>
-        </div>
-
-        <div class="heatmap-section card">
-            <h3 class="section-title">Monthly Activity Heat Map</h3>
-            <div class="heatmap-header">
-                <div class="heatmap-month-year" id="heatmap-month-year"></div>
-            </div>
-            <div class="heatmap-legend">
-                <span>Less Energy</span>
-                <div class="legend-scale">
-                    <div class="legend-box level-0"></div>
-                    <div class="legend-box level-1"></div>
-                    <div class="legend-box level-2"></div>
-                    <div class="legend-box level-3"></div>
-                    <div class="legend-box level-4"></div>
-                </div>
-                <span>More Energy</span>
-            </div>
-            <div id="heatmap-calendar" class="heatmap-calendar">
-            </div>
-        </div>
+        </section>
 
     </div>
 
@@ -187,6 +277,30 @@
                 <div id="modal-room-breakdown">
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div id="add-device-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <button class="modal-close-btn" id="add-device-modal-close-btn">&times;</button>
+            <h3 class="modal-title">Add New Device</h3>
+            <form id="add-device-form">
+                <div class="form-group">
+                    <label for="device-name">Device Name</label>
+                    <input type="text" id="device-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="device-room">Room</label>
+                    <input type="text" id="device-room" required>
+                </div>
+                <div class="form-group">
+                    <label for="device-type">Device Type</label>
+                    <input type="text" id="device-type" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Add Device</button>
+                </div>
+            </form>
         </div>
     </div>
 

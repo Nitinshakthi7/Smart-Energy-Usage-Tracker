@@ -165,6 +165,82 @@ exports.getHeatMapData = async (req, res) => {
     }
 };
 
+exports.getHistoryData = async (req, res) => {
+    try {
+        const { homeId } = req.params;
+        const { timeRange = 'month', device = 'all', sortBy = 'date_desc' } = req.query;
+
+        const home = await Home.findOne({ _id: homeId, user: req.user.id });
+        if (!home) {
+            return res.status(404).json({ success: false, message: 'Home not found' });
+        }
+
+        let startDate = new Date();
+        switch (timeRange) {
+            case 'day':
+                startDate.setDate(startDate.getDate() - 1);
+                break;
+            case 'week':
+                startDate.setDate(startDate.getDate() - 7);
+                break;
+            case 'year':
+                startDate.setFullYear(startDate.getFullYear() - 1);
+                break;
+            case 'month':
+            default:
+                startDate.setMonth(startDate.getMonth() - 1);
+                break;
+        }
+
+        const query = {
+            home: homeId,
+            timestamp: { $gte: startDate },
+        };
+
+        if (device !== 'all') {
+            query.deviceName = device;
+        }
+
+        const sortOptions = {};
+        switch (sortBy) {
+            case 'date_asc':
+                sortOptions.timestamp = 1;
+                break;
+            case 'usage_desc':
+                sortOptions.energyConsumed = -1;
+                break;
+            case 'usage_asc':
+                sortOptions.energyConsumed = 1;
+                break;
+            case 'date_desc':
+            default:
+                sortOptions.timestamp = -1;
+                break;
+        }
+
+        const readings = await EnergyReading.find(query).sort(sortOptions);
+
+        const historyData = readings.map(reading => ({
+            date: reading.timestamp.toISOString().split('T')[0],
+            device: reading.deviceName,
+            usage: reading.energyConsumed.toFixed(2),
+            cost: (reading.energyConsumed * home.electricityRate).toFixed(2),
+        }));
+
+        res.status(200).json({
+            success: true,
+            data: historyData,
+        });
+
+    } catch (error) {
+        console.error('History data error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while fetching history data',
+        });
+    }
+};
+
 function getTimeAgo(date) {
     const seconds = Math.floor((new Date() - date) / 1000);
     

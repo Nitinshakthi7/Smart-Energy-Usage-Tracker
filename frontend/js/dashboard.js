@@ -4,6 +4,13 @@ let timelineChart = null;
 let currentWatts = 0;
 let homeId = null;
 
+let devices = [
+    { name: 'Air Conditioner', room: 'Living Room', type: 'Cooling' },
+    { name: 'Refrigerator', room: 'Kitchen', type: 'Appliance' },
+    { name: 'Washing Machine', room: 'Laundry', type: 'Appliance' },
+    { name: 'TV', room: 'Living Room', type: 'Entertainment' },
+];
+
 document.addEventListener('DOMContentLoaded', async function() {
     
     checkAuthentication();
@@ -14,8 +21,94 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     setupLogout();
     
+    setupTabs();
+    
+    setupDeviceModal();
+
+    loadDevices();
+    
     setInterval(updateLiveData, 5000);
 });
+
+function setupDeviceModal() {
+    const addDeviceBtn = document.getElementById('add-device-btn');
+    const modal = document.getElementById('add-device-modal');
+    const closeModalBtn = document.getElementById('add-device-modal-close-btn');
+    const addDeviceForm = document.getElementById('add-device-form');
+
+    addDeviceBtn.addEventListener('click', () => {
+        modal.classList.remove('hidden');
+    });
+
+    closeModalBtn.addEventListener('click', () => {
+        modal.classList.add('hidden');
+    });
+
+    addDeviceForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const deviceName = document.getElementById('device-name').value;
+        const deviceRoom = document.getElementById('device-room').value;
+        const deviceType = document.getElementById('device-type').value;
+
+        const newDevice = { name: deviceName, room: deviceRoom, type: deviceType };
+        console.log('New Device:', newDevice);
+
+        // In a real application, you would send this data to the server.
+        // For now, we'll just add it to our local array.
+        devices.push(newDevice);
+        
+        addDeviceForm.reset();
+        modal.classList.add('hidden');
+        
+        // Re-render the devices list with the new device.
+        renderDevices(devices);
+    });
+}
+
+function loadDevices() {
+    renderDevices(devices);
+}
+
+function renderDevices(devices) {
+    const tbody = document.getElementById('devices-tbody');
+    tbody.innerHTML = '';
+
+    devices.forEach(device => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${device.name}</td>
+            <td>${device.room}</td>
+            <td>${device.type}</td>
+            <td>
+                <button class="btn-icon">✏️</button>
+                <button class="btn-icon">🗑️</button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function setupTabs() {
+    const tabs = document.querySelectorAll('.nav-tab');
+    const contents = document.querySelectorAll('.tab-content');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            e.preventDefault();
+
+            tabs.forEach(t => t.classList.remove('active'));
+            contents.forEach(c => c.classList.remove('active'));
+
+            tab.classList.add('active');
+            const contentId = tab.getAttribute('data-tab');
+            document.querySelector(`[data-content="${contentId}"]`).classList.add('active');
+
+            if (contentId === 'history') {
+                loadHistoryData();
+            }
+        });
+    });
+}
 
 function checkAuthentication() {
     const token = localStorage.getItem('token');

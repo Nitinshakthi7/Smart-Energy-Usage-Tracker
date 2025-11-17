@@ -153,7 +153,7 @@ const api = {
             }
             
             const response = await fetch(
-                `${API_BASE_URL}/analytics/heatmap/${homeId}?month=${month}`,
+                `${API_BASE_URL}/analytics/heatmap/${homeId || ''}?month=${month}`,
                 {
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -167,6 +167,37 @@ const api = {
                 throw new Error(data.message || 'Failed to get heat map data');
             }
             
+            return data;
+        } catch (error) {
+            throw error;
+        }
+    },
+
+    getHistoryData: async function(timeRange, device, sortBy) {
+        try {
+            const token = getToken();
+            if (!token) {
+                throw new Error('No authentication token found');
+            }
+
+            const params = new URLSearchParams({
+                timeRange: timeRange || 'month',
+                device: device || 'all',
+                sortBy: sortBy || 'date_desc'
+            });
+
+            const response = await fetch(`${API_BASE_URL}/analytics/history?${params.toString()}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to get history data');
+            }
+
             return data;
         } catch (error) {
             throw error;

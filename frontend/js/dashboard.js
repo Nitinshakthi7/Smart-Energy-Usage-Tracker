@@ -3,12 +3,16 @@ let topConsumersChart = null;
 let timelineChart = null;
 let currentWatts = 0;
 let homeId = null;
+let currentHeatmapData = [];
 
 let devices = [
     { name: 'Air Conditioner', room: 'Living Room', type: 'Cooling' },
     { name: 'Refrigerator', room: 'Kitchen', type: 'Appliance' },
     { name: 'Washing Machine', room: 'Laundry', type: 'Appliance' },
     { name: 'TV', room: 'Living Room', type: 'Entertainment' },
+    { name: 'Ceiling Fan', room: 'Bedroom', type: 'Fan' },
+    { name: 'Water Heater', room: 'Bathroom', type: 'Water Heater' },
+    { name: 'Laptop Charger', room: 'Study Room', type: 'Electronics' }
 ];
 
 document.addEventListener('DOMContentLoaded', async function() {
@@ -24,6 +28,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     setupTabs();
     
     setupDeviceModal();
+    setupDayDetailsModal();
 
     loadDevices();
     
@@ -71,20 +76,57 @@ function loadDevices() {
 
 function renderDevices(devices) {
     const tbody = document.getElementById('devices-tbody');
+    if (!tbody) {
+        return;
+    }
+
     tbody.innerHTML = '';
 
-    devices.forEach(device => {
+    devices.forEach((device, index) => {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${device.name}</td>
             <td>${device.room}</td>
             <td>${device.type}</td>
             <td>
-                <button class="btn-icon">✏️</button>
-                <button class="btn-icon">🗑️</button>
+                <button class="btn-icon edit-device" data-index="${index}">✏️</button>
+                <button class="btn-icon delete-device" data-index="${index}">🗑️</button>
             </td>
         `;
         tbody.appendChild(row);
+    });
+
+    const editButtons = tbody.querySelectorAll('.edit-device');
+    editButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const index = parseInt(button.getAttribute('data-index'), 10);
+            const device = devices[index];
+            const newName = prompt('Device name', device.name) || device.name;
+            const newRoom = prompt('Room', device.room) || device.room;
+            const newType = prompt('Type', device.type) || device.type;
+
+            devices[index] = {
+                name: newName,
+                room: newRoom,
+                type: newType
+            };
+
+            renderDevices(devices);
+        });
+    });
+
+    const deleteButtons = tbody.querySelectorAll('.delete-device');
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const index = parseInt(button.getAttribute('data-index'), 10);
+            const device = devices[index];
+
+            const confirmed = confirm(`Delete ${device.name}?`);
+            if (confirmed) {
+                devices.splice(index, 1);
+                renderDevices(devices);
+            }
+        });
     });
 }
 
@@ -108,6 +150,61 @@ function setupTabs() {
             }
         });
     });
+}
+
+async function loadHistoryData() {
+    const tbody = document.getElementById('history-tbody');
+    const deviceFilter = document.getElementById('device-filter');
+    const timeRangeSelect = document.getElementById('time-range-filter');
+    const sortBySelect = document.getElementById('sort-by');
+
+    if (!tbody) {
+        return;
+    }
+
+    const timeRange = timeRangeSelect ? timeRangeSelect.value : 'month';
+    const device = deviceFilter ? deviceFilter.value : 'all';
+    const sortBy = sortBySelect ? sortBySelect.value : 'date_desc';
+
+    try {
+        const response = await api.getHistoryData(timeRange, device, sortBy);
+        let rows = (response && response.data) || [];
+
+        if (!rows.length) {
+            rows = generateMockHistory();
+        }
+
+        fillHistoryTable(rows, tbody, deviceFilter);
+    } catch (error) {
+        console.error('Failed to load history data:', error);
+        const rows = generateMockHistory();
+        fillHistoryTable(rows, tbody, deviceFilter);
+    }
+}
+
+function fillHistoryTable(rows, tbody, deviceFilter) {
+    tbody.innerHTML = '';
+
+    rows.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${item.date}</td>
+            <td>${item.device}</td>
+            <td>${item.usage}</td>
+            <td>${item.cost}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    if (deviceFilter && deviceFilter.options.length === 1) {
+        const deviceNames = Array.from(new Set(rows.map(row => row.device)));
+        deviceNames.forEach(name => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            deviceFilter.appendChild(option);
+        });
+    }
 }
 
 function checkAuthentication() {
@@ -352,6 +449,8 @@ function updateHeatMap(heatmapData) {
     const container = document.getElementById('heatmap-calendar');
     container.innerHTML = '';
 
+    currentHeatmapData = heatmapData || [];
+
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
@@ -383,8 +482,77 @@ function updateHeatMap(heatmapData) {
         day.textContent = i + 1;
         day.setAttribute('data-day', i + 1);
         day.setAttribute('title', `Day ${i + 1}: Level ${level}`);
+
+        day.addEventListener('click', () => {
+            handleHeatmapDayClick(i + 1, level, year, month);
+        });
+
         container.appendChild(day);
     }
+}
+
+function handleHeatmapDayClick(dayNumber, level, year, month) {
+    const modal = document.getElementById('day-details-modal');
+    if (!modal) {
+        return;
+    }
+
+    const date = new Date(year, month, dayNumber);
+    const dateString = date.toISOString().split('T')[0];
+
+    const baseUsage = 5 + level * 2;
+    const totalUsage = baseUsage.toFixed(2);
+    const costPerKwh = 15;
+    const totalCost = (baseUsage * costPerKwh).toFixed(2);
+
+    const rooms = generateMockRooms();
+    let maxRoom = rooms[0];
+    rooms.forEach(room => {
+        if (room.consumption > maxRoom.consumption) {
+            maxRoom = room;
+        }
+    });
+
+    const devicesList = generateMockConsumers();
+    let maxDevice = devicesList[0];
+    devicesList.forEach(device => {
+        if (device.consumption > maxDevice.consumption) {
+            maxDevice = device;
+        }
+    });
+
+    const dateEl = document.getElementById('modal-date');
+    const totalUsageEl = document.getElementById('modal-total-usage');
+    const totalCostEl = document.getElementById('modal-total-cost');
+    const topApplianceEl = document.getElementById('modal-top-appliance');
+    const roomBreakdownEl = document.getElementById('modal-room-breakdown');
+
+    if (dateEl) {
+        dateEl.textContent = dateString;
+    }
+    if (totalUsageEl) {
+        totalUsageEl.textContent = `${totalUsage} kWh`;
+    }
+    if (totalCostEl) {
+        totalCostEl.textContent = `₹${totalCost}`;
+    }
+    if (topApplianceEl) {
+        topApplianceEl.textContent = `${maxDevice.name} - ${maxDevice.consumption} kWh`;
+    }
+    if (roomBreakdownEl) {
+        roomBreakdownEl.innerHTML = '';
+        rooms.forEach(room => {
+            const div = document.createElement('div');
+            const value = (room.consumption + level).toFixed(2);
+            div.textContent = `${room.name}: ${value} kWh`;
+            if (room.name === maxRoom.name) {
+                div.style.fontWeight = 'bold';
+            }
+            roomBreakdownEl.appendChild(div);
+        });
+    }
+
+    modal.classList.remove('hidden');
 }
 
 function updateLastUpdated() {
@@ -427,6 +595,25 @@ function setupLogout() {
     document.getElementById('logout-btn').addEventListener('click', () => {
         if (confirm('Are you sure you want to logout?')) {
             api.logout();
+        }
+    });
+}
+
+function setupDayDetailsModal() {
+    const modal = document.getElementById('day-details-modal');
+    const closeBtn = document.getElementById('modal-close-btn');
+
+    if (!modal || !closeBtn) {
+        return;
+    }
+
+    closeBtn.addEventListener('click', () => {
+        modal.classList.add('hidden');
+    });
+
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            modal.classList.add('hidden');
         }
     });
 }
@@ -506,4 +693,28 @@ function generateMockRooms() {
 
 function generateMockHeatMap() {
     return Array.from({ length: 35 }, () => Math.floor(Math.random() * 5));
+}
+
+function generateMockHistory() {
+    const history = [];
+    const today = new Date();
+    const deviceNames = ['Air Conditioner', 'Refrigerator', 'Washing Machine', 'TV', 'Water Heater', 'Fan'];
+
+    for (let i = 0; i < 15; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+
+        const device = deviceNames[i % deviceNames.length];
+        const usage = (1 + Math.random() * 4).toFixed(2);
+        const cost = (usage * 15).toFixed(2);
+
+        history.push({
+            date: date.toISOString().split('T')[0],
+            device: device,
+            usage: usage,
+            cost: cost
+        });
+    }
+
+    return history;
 }

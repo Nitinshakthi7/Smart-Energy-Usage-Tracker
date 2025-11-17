@@ -4,16 +4,25 @@ const Alert = require('../models/Alert');
 
 exports.getDashboardData = async (req, res) => {
     try {
-        const { homeId } = req.params;
+        let { homeId } = req.params;
         const period = req.query.period || 'today';
-        
-        const home = await Home.findOne({ _id: homeId, user: req.user.id });
-        
+
+        let home;
+        if (homeId) {
+            home = await Home.findOne({ _id: homeId, user: req.user.id });
+        } else {
+            home = await Home.findOne({ user: req.user.id });
+        }
+
         if (!home) {
             return res.status(404).json({
                 success: false,
                 message: 'Home not found'
             });
+        }
+
+        if (!homeId) {
+            homeId = home._id;
         }
         
         let startDate;
@@ -137,16 +146,25 @@ exports.getDashboardData = async (req, res) => {
 
 exports.getHeatMapData = async (req, res) => {
     try {
-        const { homeId } = req.params;
+        let { homeId } = req.params;
         const month = req.query.month;
-        
-        const home = await Home.findOne({ _id: homeId, user: req.user.id });
-        
+
+        let home;
+        if (homeId) {
+            home = await Home.findOne({ _id: homeId, user: req.user.id });
+        } else {
+            home = await Home.findOne({ user: req.user.id });
+        }
+
         if (!home) {
             return res.status(404).json({
                 success: false,
                 message: 'Home not found'
             });
+        }
+
+        if (!homeId) {
+            homeId = home._id;
         }
         
         const heatmap = Array.from({ length: 35 }, () => Math.floor(Math.random() * 5));
@@ -167,12 +185,22 @@ exports.getHeatMapData = async (req, res) => {
 
 exports.getHistoryData = async (req, res) => {
     try {
-        const { homeId } = req.params;
+        let { homeId } = req.params;
         const { timeRange = 'month', device = 'all', sortBy = 'date_desc' } = req.query;
 
-        const home = await Home.findOne({ _id: homeId, user: req.user.id });
+        let home;
+        if (homeId) {
+            home = await Home.findOne({ _id: homeId, user: req.user.id });
+        } else {
+            home = await Home.findOne({ user: req.user.id });
+        }
+
         if (!home) {
             return res.status(404).json({ success: false, message: 'Home not found' });
+        }
+
+        if (!homeId) {
+            homeId = home._id;
         }
 
         let startDate = new Date();

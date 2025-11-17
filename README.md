@@ -172,6 +172,7 @@ You will see your home, rooms, and devices, including the device’s `_id`.
 
 ### 6. Add Energy Data (Single Reading)
 
+Important: Energy readings can only be submitted via Postman or direct API calls. The website interface does not support adding readings directly.
 Use the `homeId`, `roomId`, and `deviceId` obtained from the previous responses.
 
 ```http

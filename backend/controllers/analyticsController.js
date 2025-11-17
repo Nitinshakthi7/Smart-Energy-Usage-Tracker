@@ -114,7 +114,8 @@ exports.getDashboardData = async (req, res) => {
             time: getTimeAgo(alert.createdAt)
         }));
         
-        const heatmap = Array.from({ length: 35 }, () => Math.floor(Math.random() * 5));
+        // For now, do not generate fake heatmap data; frontend will handle empty array
+        const heatmap = [];
         
         res.status(200).json({
             success: true,
@@ -167,7 +168,8 @@ exports.getHeatMapData = async (req, res) => {
             homeId = home._id;
         }
         
-        const heatmap = Array.from({ length: 35 }, () => Math.floor(Math.random() * 5));
+        // No fake heatmap data; return empty array until real aggregation is implemented
+        const heatmap = [];
         
         res.status(200).json({
             success: true,

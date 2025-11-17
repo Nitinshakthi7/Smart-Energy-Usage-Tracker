@@ -117,14 +117,6 @@
             <div class="alerts-section card">
                 <h3 class="section-title">⚠️ Alerts & Recommendations</h3>
                 <div id="alerts-container" class="alerts-container">
-                    <div class="alert-item alert-warning">
-                        <div class="alert-icon">⚠️</div>
-                        <div class="alert-content">
-                            <div class="alert-title">High Usage Detected</div>
-                            <div class="alert-message">Air conditioner has been running for 8 hours continuously</div>
-                            <div class="alert-time">2 minutes ago</div>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -162,6 +154,12 @@
             </div>
 
             <div class="toolbar">
+                <div class="filter-group">
+                    <label for="room-filter">Room:</label>
+                    <select id="room-filter">
+                        <option value="">Select a room</option>
+                    </select>
+                </div>
                 <button id="add-device-btn" class="btn btn-primary">Add New Device</button>
             </div>
 
@@ -238,9 +236,51 @@
         <section id="settings-content" class="tab-content" data-content="settings">
             <div class="welcome-section">
                 <h1>Settings</h1>
-                <p>Configure your account and preferences.</p>
+                <p>Manage your home, rooms, and basic configuration.</p>
             </div>
-            
+
+            <div class="settings-grid">
+                <div class="card settings-card">
+                    <h2>Current Home</h2>
+                    <p><strong>Name:</strong> <span id="current-home-name">No home found</span></p>
+                    <p><strong>Rooms:</strong> <span id="current-rooms-count">-</span></p>
+                    <p id="settings-status" class="settings-status"></p>
+                </div>
+
+                <div class="card settings-card">
+                    <h2>Create Home</h2>
+                    <form id="create-home-form">
+                        <div class="form-group">
+                            <label for="home-name">Home Name</label>
+                            <input type="text" id="home-name" placeholder="My Home">
+                        </div>
+                        <div class="form-group">
+                            <label for="home-rate">Electricity Rate (₹/kWh)</label>
+                            <input type="number" step="0.1" id="home-rate" placeholder="7.5">
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Create Home</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card settings-card">
+                    <h2>Add Room to Current Home</h2>
+                    <form id="add-room-form">
+                        <div class="form-group">
+                            <label for="room-name-settings">Room Name</label>
+                            <input type="text" id="room-name-settings" placeholder="Living Room" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="room-icon-settings">Icon (optional)</label>
+                            <input type="text" id="room-icon-settings" placeholder="🛋️">
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Add Room</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </section>
 
     </div>
@@ -290,12 +330,16 @@
                     <input type="text" id="device-name" required>
                 </div>
                 <div class="form-group">
-                    <label for="device-room">Room</label>
-                    <input type="text" id="device-room" required>
+                    <label>Room</label>
+                    <div id="selected-room-name" class="selected-room-name"></div>
                 </div>
                 <div class="form-group">
                     <label for="device-type">Device Type</label>
                     <input type="text" id="device-type" required>
+                </div>
+                <div class="form-group">
+                    <label for="device-power-rating">Power Rating (W)</label>
+                    <input type="number" id="device-power-rating" required min="1">
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Add Device</button>

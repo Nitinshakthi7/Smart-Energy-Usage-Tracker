@@ -144,6 +144,96 @@ const api = {
             throw error;
         }
     },
+
+    createHome: async function(name, electricityRate) {
+        try {
+            const token = getToken();
+            if (!token) {
+                throw new Error('No authentication token found');
+            }
+
+            const body = {};
+            if (name) body.name = name;
+            if (electricityRate != null && electricityRate !== '') {
+                body.electricityRate = electricityRate;
+            }
+
+            const response = await fetch(`${API_BASE_URL}/homes`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(body)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to create home');
+            }
+
+            return data;
+        } catch (error) {
+            throw error;
+        }
+    },
+
+    addRoom: async function(homeId, name, icon) {
+        try {
+            const token = getToken();
+            if (!token) {
+                throw new Error('No authentication token found');
+            }
+
+            const response = await fetch(`${API_BASE_URL}/homes/${homeId}/rooms`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ name, icon })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to add room');
+            }
+
+            return data;
+        } catch (error) {
+            throw error;
+        }
+    },
+    
+    addDeviceToRoom: async function(homeId, roomId, device) {
+        try {
+            const token = getToken();
+            if (!token) {
+                throw new Error('No authentication token found');
+            }
+
+            const response = await fetch(`${API_BASE_URL}/homes/${homeId}/rooms/${roomId}/devices`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(device)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to add device');
+            }
+
+            return data;
+        } catch (error) {
+            throw error;
+        }
+    },
     
     getHeatMapData: async function(homeId, month) {
         try {

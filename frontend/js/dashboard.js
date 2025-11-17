@@ -5,33 +5,26 @@ let currentWatts = 0;
 let homeId = null;
 let currentHeatmapData = [];
 
-let devices = [
-    { name: 'Air Conditioner', room: 'Living Room', type: 'Cooling' },
-    { name: 'Refrigerator', room: 'Kitchen', type: 'Appliance' },
-    { name: 'Washing Machine', room: 'Laundry', type: 'Appliance' },
-    { name: 'TV', room: 'Living Room', type: 'Entertainment' },
-    { name: 'Ceiling Fan', room: 'Bedroom', type: 'Fan' },
-    { name: 'Water Heater', room: 'Bathroom', type: 'Water Heater' },
-    { name: 'Laptop Charger', room: 'Study Room', type: 'Electronics' }
-];
+let currentHome = null;
+let currentRooms = [];
+let devices = [];
+let selectedRoomId = '';
 
 document.addEventListener('DOMContentLoaded', async function() {
-    
     checkAuthentication();
-    
     await loadUserInfo();
-    
+
+    await initializeHomeContext();
     await loadDashboardData();
-    
+
     setupLogout();
-    
     setupTabs();
-    
     setupDeviceModal();
     setupDayDetailsModal();
+    setupSettings();
 
-    loadDevices();
-    
+    await loadDevices();
+
     setInterval(updateLiveData, 5000);
 });
 
@@ -40,8 +33,32 @@ function setupDeviceModal() {
     const modal = document.getElementById('add-device-modal');
     const closeModalBtn = document.getElementById('add-device-modal-close-btn');
     const addDeviceForm = document.getElementById('add-device-form');
+    const selectedRoomNameEl = document.getElementById('selected-room-name');
 
     addDeviceBtn.addEventListener('click', () => {
+        if (!currentHome) {
+            alert('Please create a home first before adding devices.');
+            return;
+        }
+        if (!currentRooms || currentRooms.length === 0) {
+            alert('Please add at least one room to your home before adding devices.');
+            return;
+        }
+        if (!selectedRoomId) {
+            alert('Please select a room from the dropdown first, then add a device.');
+            return;
+        }
+
+        const room = currentRooms.find(r => r._id === selectedRoomId);
+        if (!room) {
+            alert('Selected room not found. Please re-select the room.');
+            return;
+        }
+
+        if (selectedRoomNameEl) {
+            selectedRoomNameEl.textContent = room.name;
+        }
+
         modal.classList.remove('hidden');
     });
 
@@ -49,28 +66,67 @@ function setupDeviceModal() {
         modal.classList.add('hidden');
     });
 
-    addDeviceForm.addEventListener('submit', (e) => {
+    addDeviceForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const deviceName = document.getElementById('device-name').value;
-        const deviceRoom = document.getElementById('device-room').value;
-        const deviceType = document.getElementById('device-type').value;
+        const deviceName = document.getElementById('device-name').value.trim();
+        const deviceType = document.getElementById('device-type').value.trim();
+        const powerRatingValue = document.getElementById('device-power-rating').value;
+        const powerRating = parseInt(powerRatingValue, 10) || 0;
 
-        const newDevice = { name: deviceName, room: deviceRoom, type: deviceType };
-        console.log('New Device:', newDevice);
+        if (!homeId || !selectedRoomId) {
+            alert('Home or room not selected. Please select a room and try again.');
+            return;
+        }
 
-        // In a real application, you would send this data to the server.
-        // For now, we'll just add it to our local array.
-        devices.push(newDevice);
-        
-        addDeviceForm.reset();
-        modal.classList.add('hidden');
-        
-        // Re-render the devices list with the new device.
-        renderDevices(devices);
+        try {
+            await api.addDeviceToRoom(homeId, selectedRoomId, {
+                name: deviceName,
+                type: deviceType || 'Other',
+                powerRating: powerRating > 0 ? powerRating : 100
+            });
+
+            addDeviceForm.reset();
+            modal.classList.add('hidden');
+
+            // Reload home context and devices from backend so Postman & UI match
+            await initializeHomeContext();
+            await loadDevices();
+        } catch (error) {
+            console.error('Failed to add device:', error);
+            alert(error.message || 'Failed to add device');
+        }
     });
 }
 
-function loadDevices() {
+async function loadDevices() {
+    devices = [];
+
+    if (!currentHome || !currentRooms) {
+        renderDevices(devices);
+        return;
+    }
+
+    // Only show devices for the selected room; if none selected, keep list empty
+    if (!selectedRoomId) {
+        renderDevices(devices);
+        return;
+    }
+
+    const room = currentRooms.find(r => r._id === selectedRoomId);
+    if (!room) {
+        renderDevices(devices);
+        return;
+    }
+
+    (room.devices || []).forEach(device => {
+        devices.push({
+            id: device._id,
+            name: device.name,
+            room: room.name,
+            type: device.type
+        });
+    });
+
     renderDevices(devices);
 }
 
@@ -81,6 +137,11 @@ function renderDevices(devices) {
     }
 
     tbody.innerHTML = '';
+
+    if (!selectedRoomId) {
+        // No room selected, show nothing
+        return;
+    }
 
     devices.forEach((device, index) => {
         const row = document.createElement('tr');
@@ -148,7 +209,151 @@ function setupTabs() {
             if (contentId === 'history') {
                 loadHistoryData();
             }
+            if (contentId === 'settings') {
+                refreshSettingsHomeInfo();
+            }
+            if (contentId === 'devices') {
+                populateRoomFilter();
+            }
         });
+    });
+}
+
+function setupSettings() {
+    const createHomeForm = document.getElementById('create-home-form');
+    const addRoomForm = document.getElementById('add-room-form');
+
+    if (!createHomeForm && !addRoomForm) {
+        return;
+    }
+
+    const homeNameInput = document.getElementById('home-name');
+    const homeRateInput = document.getElementById('home-rate');
+    const roomNameInput = document.getElementById('room-name-settings');
+    const roomIconInput = document.getElementById('room-icon-settings');
+    const settingsStatus = document.getElementById('settings-status');
+
+    if (createHomeForm) {
+        createHomeForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const name = homeNameInput.value.trim();
+            const rateValue = homeRateInput.value;
+            const rate = rateValue ? parseFloat(rateValue) : undefined;
+
+            try {
+                setSettingsStatus('Creating home...', settingsStatus);
+                await api.createHome(name, rate);
+
+                homeNameInput.value = '';
+                homeRateInput.value = '';
+
+                await initializeHomeContext();
+                await loadDashboardData();
+                await loadDevices();
+
+                setSettingsStatus('Home created successfully.', settingsStatus);
+                refreshSettingsHomeInfo();
+            } catch (error) {
+                console.error('Failed to create home:', error);
+                setSettingsStatus(error.message || 'Failed to create home.', settingsStatus, true);
+            }
+        });
+    }
+
+    if (addRoomForm) {
+        addRoomForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!currentHome || !homeId) {
+                setSettingsStatus('Please create a home first before adding rooms.', settingsStatus, true);
+                return;
+            }
+
+            const roomName = roomNameInput.value.trim();
+            const roomIcon = roomIconInput.value.trim() || '🏠';
+
+            if (!roomName) {
+                setSettingsStatus('Room name is required.', settingsStatus, true);
+                return;
+            }
+
+            try {
+                setSettingsStatus('Adding room...', settingsStatus);
+                await api.addRoom(homeId, roomName, roomIcon);
+
+                roomNameInput.value = '';
+                roomIconInput.value = '';
+
+                await initializeHomeContext();
+                await loadDashboardData();
+                await loadDevices();
+
+                setSettingsStatus('Room added successfully.', settingsStatus);
+                refreshSettingsHomeInfo();
+            } catch (error) {
+                console.error('Failed to add room:', error);
+                setSettingsStatus(error.message || 'Failed to add room.', settingsStatus, true);
+            }
+        });
+    }
+}
+
+function refreshSettingsHomeInfo() {
+    const currentHomeNameEl = document.getElementById('current-home-name');
+    const currentRoomsCountEl = document.getElementById('current-rooms-count');
+
+    if (!currentHomeNameEl || !currentRoomsCountEl) {
+        return;
+    }
+
+    if (!currentHome) {
+        currentHomeNameEl.textContent = 'No home found. Create one below.';
+        currentRoomsCountEl.textContent = '-';
+        return;
+    }
+
+    currentHomeNameEl.textContent = currentHome.name;
+    currentRoomsCountEl.textContent = (currentHome.rooms || []).length;
+}
+
+function setSettingsStatus(message, element, isError = false) {
+    if (!element) return;
+    element.textContent = message;
+    element.style.color = isError ? '#e53935' : '#4caf50';
+}
+
+function populateRoomFilter() {
+    const roomFilter = document.getElementById('room-filter');
+    if (!roomFilter) return;
+
+    // Reset selection and options
+    const previousSelection = selectedRoomId;
+    roomFilter.innerHTML = '';
+
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = 'Select a room';
+    roomFilter.appendChild(defaultOption);
+
+    (currentRooms || []).forEach(room => {
+        const option = document.createElement('option');
+        option.value = room._id;
+        option.textContent = room.name;
+        roomFilter.appendChild(option);
+    });
+
+    // Try to keep previous selection if still valid
+    if (previousSelection && (currentRooms || []).some(r => r._id === previousSelection)) {
+        roomFilter.value = previousSelection;
+        selectedRoomId = previousSelection;
+    } else {
+        selectedRoomId = '';
+    }
+
+    roomFilter.addEventListener('change', async () => {
+        selectedRoomId = roomFilter.value;
+        await loadDevices();
     });
 }
 
@@ -168,17 +373,12 @@ async function loadHistoryData() {
 
     try {
         const response = await api.getHistoryData(timeRange, device, sortBy);
-        let rows = (response && response.data) || [];
-
-        if (!rows.length) {
-            rows = generateMockHistory();
-        }
+        const rows = (response && response.data) || [];
 
         fillHistoryTable(rows, tbody, deviceFilter);
     } catch (error) {
         console.error('Failed to load history data:', error);
-        const rows = generateMockHistory();
-        fillHistoryTable(rows, tbody, deviceFilter);
+        fillHistoryTable([], tbody, deviceFilter);
     }
 }
 
@@ -216,6 +416,32 @@ function checkAuthentication() {
     }
 }
 
+async function initializeHomeContext() {
+    try {
+        const response = await api.getHomes();
+        const homes = (response && response.data) || [];
+
+        if (!homes.length) {
+            console.warn('No homes found for user. Create one via Settings or Postman.');
+            homeId = null;
+            currentHome = null;
+            currentRooms = [];
+            selectedRoomId = '';
+            return;
+        }
+
+        currentHome = homes[0]; // pick the first home for now
+        homeId = currentHome._id;
+        currentRooms = currentHome.rooms || [];
+        selectedRoomId = '';
+    } catch (error) {
+        console.error('Failed to initialize home context:', error);
+        currentHome = null;
+        currentRooms = [];
+        selectedRoomId = '';
+    }
+}
+
 async function loadUserInfo() {
     try {
         const userData = await api.getCurrentUser();
@@ -234,21 +460,23 @@ async function loadDashboardData() {
     loadingOverlay.classList.remove('hidden');
     
     try {
-        const data = await api.getDashboardData(homeId, 'today');
-        
-        updateLiveMeter(data.currentPower || 450);
-        updateStatCards(data.stats || generateMockStats());
-        updateTopConsumersChart(data.topConsumers || generateMockConsumers());
-        updateTimelineChart(data.timeline || generateMockTimeline());
-        updateAlerts(data.alerts || generateMockAlerts());
-        updateRoomBreakdown(data.rooms || generateMockRooms());
-        updateHeatMap(data.heatmap || generateMockHeatMap());
+        const response = await api.getDashboardData(homeId, 'today');
+        const data = (response && response.data) || {};
+
+        updateLiveMeter(data.currentPower || 0);
+        if (data.stats) {
+            updateStatCards(data.stats);
+        }
+        updateTopConsumersChart(data.topConsumers || []);
+        updateTimelineChart(data.timeline || []);
+        updateAlerts(data.alerts || []);
+        updateRoomBreakdown(data.rooms || []);
+        updateHeatMap(data.heatmap || []);
         
         updateLastUpdated();
         
     } catch (error) {
         console.error('Failed to load dashboard data:', error);
-        loadMockData();
     } finally {
         loadingOverlay.classList.add('hidden');
     }
@@ -303,11 +531,17 @@ function getColorForWatts(watts) {
 }
 
 function updateStatCards(stats) {
-    animateValue('today-usage', 0, stats.todayUsage, 1500);
-    document.getElementById('today-cost').textContent = `₹${stats.todayCost}`;
-    animateValue('carbon-footprint', 0, stats.carbonFootprint, 1500);
-    document.getElementById('trees-needed').textContent = stats.treesNeeded;
-    animateValue('streak-days', 0, stats.streakDays, 1000);
+    const todayUsage = Number(stats.todayUsage) || 0;
+    const todayCost = Number(stats.todayCost) || 0;
+    const carbonFootprint = Number(stats.carbonFootprint) || 0;
+    const treesNeeded = stats.treesNeeded || 0;
+    const streakDays = stats.streakDays || 0;
+
+    animateValue('today-usage', 0, todayUsage, 1500);
+    document.getElementById('today-cost').textContent = `₹${todayCost}`;
+    animateValue('carbon-footprint', 0, carbonFootprint, 1500);
+    document.getElementById('trees-needed').textContent = treesNeeded;
+    animateValue('streak-days', 0, streakDays, 1000);
 }
 
 function updateTopConsumersChart(consumers) {
@@ -316,14 +550,17 @@ function updateTopConsumersChart(consumers) {
     if (topConsumersChart) {
         topConsumersChart.destroy();
     }
+
+    const labels = (consumers || []).map(c => c.name);
+    const values = (consumers || []).map(c => Number(c.consumption) || 0);
     
     topConsumersChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: consumers.map(c => c.name),
+            labels,
             datasets: [{
                 label: 'Energy (kWh)',
-                data: consumers.map(c => c.consumption),
+                data: values,
                 backgroundColor: '#0066ff',
                 borderRadius: 8
             }]
@@ -359,14 +596,17 @@ function updateTimelineChart(timeline) {
     if (timelineChart) {
         timelineChart.destroy();
     }
+
+    const labels = (timeline || []).map(t => t.hour);
+    const values = (timeline || []).map(t => Number(t.watts) || 0);
     
     timelineChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: timeline.map(t => t.hour),
+            labels,
             datasets: [{
                 label: 'Power (W)',
-                data: timeline.map(t => t.watts),
+                data: values,
                 borderColor: '#0066ff',
                 backgroundColor: 'rgba(0, 102, 255, 0.1)',
                 tension: 0.4,
@@ -430,7 +670,7 @@ function updateRoomBreakdown(rooms) {
     const container = document.getElementById('rooms-container');
     container.innerHTML = '';
     
-    rooms.forEach(room => {
+    (rooms || []).forEach(room => {
         const roomDiv = document.createElement('div');
         roomDiv.className = 'room-card';
         roomDiv.innerHTML = `
@@ -500,26 +740,11 @@ function handleHeatmapDayClick(dayNumber, level, year, month) {
     const date = new Date(year, month, dayNumber);
     const dateString = date.toISOString().split('T')[0];
 
+    // For now, show only basic info derived from the heatmap level
     const baseUsage = 5 + level * 2;
     const totalUsage = baseUsage.toFixed(2);
     const costPerKwh = 15;
     const totalCost = (baseUsage * costPerKwh).toFixed(2);
-
-    const rooms = generateMockRooms();
-    let maxRoom = rooms[0];
-    rooms.forEach(room => {
-        if (room.consumption > maxRoom.consumption) {
-            maxRoom = room;
-        }
-    });
-
-    const devicesList = generateMockConsumers();
-    let maxDevice = devicesList[0];
-    devicesList.forEach(device => {
-        if (device.consumption > maxDevice.consumption) {
-            maxDevice = device;
-        }
-    });
 
     const dateEl = document.getElementById('modal-date');
     const totalUsageEl = document.getElementById('modal-total-usage');
@@ -537,19 +762,10 @@ function handleHeatmapDayClick(dayNumber, level, year, month) {
         totalCostEl.textContent = `₹${totalCost}`;
     }
     if (topApplianceEl) {
-        topApplianceEl.textContent = `${maxDevice.name} - ${maxDevice.consumption} kWh`;
+        topApplianceEl.textContent = 'Details per device not available yet.';
     }
     if (roomBreakdownEl) {
         roomBreakdownEl.innerHTML = '';
-        rooms.forEach(room => {
-            const div = document.createElement('div');
-            const value = (room.consumption + level).toFixed(2);
-            div.textContent = `${room.name}: ${value} kWh`;
-            if (room.name === maxRoom.name) {
-                div.style.fontWeight = 'bold';
-            }
-            roomBreakdownEl.appendChild(div);
-        });
     }
 
     modal.classList.remove('hidden');
@@ -566,9 +782,8 @@ function updateLastUpdated() {
 
 async function updateLiveData() {
     try {
-        const randomWatts = 300 + Math.random() * 400;
-        updateLiveMeter(randomWatts);
-        updateLastUpdated();
+        // Re-fetch latest dashboard data periodically instead of generating fake watts
+        await loadDashboardData();
     } catch (error) {
         console.error('Failed to update live data:', error);
     }
@@ -618,103 +833,3 @@ function setupDayDetailsModal() {
     });
 }
 
-function loadMockData() {
-    updateLiveMeter(450);
-    updateStatCards(generateMockStats());
-    updateTopConsumersChart(generateMockConsumers());
-    updateTimelineChart(generateMockTimeline());
-    updateAlerts(generateMockAlerts());
-    updateRoomBreakdown(generateMockRooms());
-    updateHeatMap(generateMockHeatMap());
-}
-
-function generateMockStats() {
-    return {
-        todayUsage: 12.5,
-        todayCost: 187,
-        carbonFootprint: 8.5,
-        treesNeeded: 5,
-        streakDays: 14
-    };
-}
-
-function generateMockConsumers() {
-    return [
-        { name: 'Air Conditioner', consumption: 4.2 },
-        { name: 'Water Heater', consumption: 2.8 },
-        { name: 'Refrigerator', consumption: 2.1 },
-        { name: 'Washing Machine', consumption: 1.5 },
-        { name: 'TV', consumption: 0.9 }
-    ];
-}
-
-function generateMockTimeline() {
-    const hours = [];
-    for (let i = 0; i < 24; i++) {
-        hours.push({
-            hour: `${i}:00`,
-            watts: 200 + Math.random() * 600
-        });
-    }
-    return hours;
-}
-
-function generateMockAlerts() {
-    return [
-        {
-            type: 'warning',
-            title: 'High Usage Detected',
-            message: 'Air conditioner has been running for 8 hours continuously',
-            time: '2 minutes ago'
-        },
-        {
-            type: 'info',
-            title: 'Peak Hours Soon',
-            message: 'Peak electricity rates start in 30 minutes',
-            time: '15 minutes ago'
-        },
-        {
-            type: 'success',
-            title: 'Goal Achieved',
-            message: 'You used 20% less energy than yesterday!',
-            time: '1 hour ago'
-        }
-    ];
-}
-
-function generateMockRooms() {
-    return [
-        { name: 'Living Room', icon: '🛋️', consumption: 3.2, devices: 5 },
-        { name: 'Bedroom', icon: '🛏️', consumption: 2.8, devices: 4 },
-        { name: 'Kitchen', icon: '🍳', consumption: 4.1, devices: 6 },
-        { name: 'Bathroom', icon: '🚿', consumption: 2.4, devices: 3 }
-    ];
-}
-
-function generateMockHeatMap() {
-    return Array.from({ length: 35 }, () => Math.floor(Math.random() * 5));
-}
-
-function generateMockHistory() {
-    const history = [];
-    const today = new Date();
-    const deviceNames = ['Air Conditioner', 'Refrigerator', 'Washing Machine', 'TV', 'Water Heater', 'Fan'];
-
-    for (let i = 0; i < 15; i++) {
-        const date = new Date(today);
-        date.setDate(today.getDate() - i);
-
-        const device = deviceNames[i % deviceNames.length];
-        const usage = (1 + Math.random() * 4).toFixed(2);
-        const cost = (usage * 15).toFixed(2);
-
-        history.push({
-            date: date.toISOString().split('T')[0],
-            device: device,
-            usage: usage,
-            cost: cost
-        });
-    }
-
-    return history;
-}

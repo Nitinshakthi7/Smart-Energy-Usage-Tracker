@@ -27,24 +27,7 @@ exports.createHome = async (req, res) => {
             user: req.user.id,
             name: name || 'My Home',
             electricityRate: electricityRate || 7.5,
-            rooms: [
-                {
-                    name: 'Living Room',
-                    icon: '🛋️',
-                    devices: [
-                        { name: 'TV', type: 'TV', powerRating: 150 },
-                        { name: 'AC', type: 'AC', powerRating: 1500 }
-                    ]
-                },
-                {
-                    name: 'Kitchen',
-                    icon: '🍳',
-                    devices: [
-                        { name: 'Refrigerator', type: 'Refrigerator', powerRating: 200 },
-                        { name: 'Microwave', type: 'Other', powerRating: 1000 }
-                    ]
-                }
-            ]
+            rooms: [] // start with no rooms or devices; user adds them explicitly
         });
         
         res.status(201).json({
